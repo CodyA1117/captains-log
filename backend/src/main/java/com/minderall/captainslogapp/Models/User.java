@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import java.util.List;
 
 @Entity
+@Table(name = "app_user")
 public class User {
 
     @Id
@@ -23,7 +24,7 @@ public class User {
     private String role;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<KeyStore.Entry> entries;
+    private List<Entry> entries;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OuraData> ouraData;
@@ -74,11 +75,11 @@ public class User {
         this.role = role;
     }
 
-    public List<KeyStore.Entry> getEntries() {
+    public List<Entry> getEntries() {
         return entries;
     }
 
-    public void setEntries(List<KeyStore.Entry> entries) {
+    public void setEntries(List<Entry> entries) {
         this.entries = entries;
     }
 
