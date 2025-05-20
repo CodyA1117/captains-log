@@ -8,4 +8,5 @@ import java.util.Optional;
 
 public interface OuraTokenRepository extends JpaRepository<OuraToken, Long> {
     Optional<OuraToken> findByUser(User user);
+    Optional<OuraToken> findByUserEmail(String email);
 }

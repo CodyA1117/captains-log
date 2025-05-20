@@ -6,6 +6,7 @@ import com.minderall.captainslogapp.Models.OuraToken;
 import com.minderall.captainslogapp.Models.User;
 import com.minderall.captainslogapp.Repositories.OuraTokenRepository;
 import com.minderall.captainslogapp.Repositories.UserRepository;
+import com.minderall.captainslogapp.Services.OuraDataService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,6 +45,16 @@ public class OuraOAuthController {
 
     @Autowired
     private OuraTokenRepository ouraTokenRepository;
+
+    @Autowired
+    private OuraDataService ouraDataService;
+
+    //Triggers fetch manually for testing.
+    @GetMapping("/fetch-readiness")
+    public ResponseEntity<String> fetchTodayReadiness(Principal principal) {
+        ouraDataService.fetchAndSaveTodayReadiness(principal.getName());
+        return ResponseEntity.ok("Readiness data fetched and saved.");
+    }
 
     // 1. Start the Oura OAuth process
     @GetMapping("/start")
