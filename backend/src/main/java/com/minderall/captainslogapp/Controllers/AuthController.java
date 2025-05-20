@@ -3,6 +3,8 @@ package com.minderall.captainslogapp.Controllers;
 import com.minderall.captainslogapp.Models.User;
 import com.minderall.captainslogapp.Repositories.UserRepository;
 import com.minderall.captainslogapp.Security.JwtUtil;
+import com.minderall.captainslogapp.dto.AuthenticationRequestDTO;
+import com.minderall.captainslogapp.dto.AuthenticationResponseDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -28,28 +30,37 @@ public class AuthController {
     private JwtUtil jwtUtil;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody User user) {
-        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().body("Email already in use");
+    public ResponseEntity<AuthenticationResponseDTO> register(@RequestBody AuthenticationRequestDTO request) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            return ResponseEntity.badRequest().build();
         }
 
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setRole("USER"); // default role
-        userRepository.save(user);
+        User newUser = new User();
+        newUser.setEmail(request.getEmail());
+        newUser.setPassword(passwordEncoder.encode(request.getPassword()));
+        newUser.setRole("USER"); // default role
+        userRepository.save(newUser);
 
-        return ResponseEntity.ok("User registered successfully");
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
+
+        String email = authentication.getName(); // This is the username/email
+        String token = jwtUtil.generateToken(email);
+
+        return ResponseEntity.ok(new AuthenticationResponseDTO(token, newUser.getEmail(), newUser.getRole()));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody User loginRequest) {
+    public ResponseEntity<AuthenticationResponseDTO> login(@RequestBody AuthenticationRequestDTO request) {
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getEmail(),
-                        loginRequest.getPassword()
-                )
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
-        String token = jwtUtil.generateToken(loginRequest.getEmail());
-        return ResponseEntity.ok(token);
+        String email = authentication.getName(); // This is the username/email
+        String token = jwtUtil.generateToken(email);
+
+        User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
+        return ResponseEntity.ok(new AuthenticationResponseDTO(token, user.getEmail(), user.getRole()));
     }
 }
