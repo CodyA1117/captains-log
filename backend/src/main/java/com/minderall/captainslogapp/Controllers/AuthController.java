@@ -7,6 +7,7 @@ import com.minderall.captainslogapp.dto.AuthenticationRequestDTO;
 import com.minderall.captainslogapp.dto.AuthenticationResponseDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -28,6 +29,12 @@ public class AuthController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/api/test/admin-only")
+    public String adminOnlyRoute() {
+        return "Only accessible by users with ADMIN role!";
+    }
 
     @PostMapping("/register")
     public ResponseEntity<AuthenticationResponseDTO> register(@RequestBody AuthenticationRequestDTO request) {
@@ -63,4 +70,6 @@ public class AuthController {
         User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
         return ResponseEntity.ok(new AuthenticationResponseDTO(token, user.getEmail(), user.getRole()));
     }
+
+
 }
