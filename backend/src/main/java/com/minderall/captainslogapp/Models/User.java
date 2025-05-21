@@ -19,6 +19,13 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "nutritionix_user_id")
+    private String nutritionixUserId;
+
+    @Column(name = "is_nutritionix_connected")
+    private boolean isNutritionixConnected = false;
+
+
     private boolean isRunwayComplete;
 
     private String role;
@@ -105,5 +112,21 @@ public class User {
 
     public void setTags(List<Tag> tags) {
         this.tags = tags;
+    }
+
+    public String getNutritionixUserId() {
+        return nutritionixUserId;
+    }
+
+    public void setNutritionixUserId(String nutritionixUserId) {
+        this.nutritionixUserId = nutritionixUserId;
+    }
+
+    public boolean isNutritionixConnected() {
+        return isNutritionixConnected;
+    }
+
+    public void setNutritionixConnected(boolean nutritionixConnected) {
+        isNutritionixConnected = nutritionixConnected;
     }
 }
