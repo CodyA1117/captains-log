@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minderall.captainslogapp.Models.OuraData;
 import com.minderall.captainslogapp.Models.OuraToken;
+import com.minderall.captainslogapp.Models.User;
 import com.minderall.captainslogapp.Repositories.OuraDataRepository;
 import com.minderall.captainslogapp.Repositories.OuraTokenRepository;
+import com.minderall.captainslogapp.Repositories.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,11 @@ public class OuraDataService {
 
     @Autowired
     private OuraDataRepository dataRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+
 
     private final String readinessEndpoint = "https://api.ouraring.com/v2/usercollection/readiness";
     private final String sleepEndpoint = "https://api.ouraring.com/v2/usercollection/sleep";
@@ -286,6 +293,16 @@ public class OuraDataService {
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         return new HttpEntity<>(headers);
     }
+
+    public Optional<OuraData> getTodayOuraData(String email) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) return Optional.empty();
+
+        User user = userOpt.get();
+        LocalDate today = LocalDate.now();
+        return dataRepository.findByUserAndDate(user, today);
+    }
+
 
 
 }

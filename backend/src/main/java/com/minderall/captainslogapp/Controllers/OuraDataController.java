@@ -53,5 +53,16 @@ public class OuraDataController {
         // You can implement this later if you're calculating stress from other metrics
         return ResponseEntity.ok("Stress score syncing not implemented yet.");
     }
+
+    @CrossOrigin(origins = "http://localhost:3000")
+    @GetMapping("/today")
+    public ResponseEntity<?> getTodayOuraData(@AuthenticationPrincipal UserDetails userDetails) {
+        String email = userDetails.getUsername();
+
+        return ouraDataService.getTodayOuraData(email)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
+    }
+
 }
 
