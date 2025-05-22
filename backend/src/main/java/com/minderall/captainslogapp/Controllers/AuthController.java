@@ -55,7 +55,7 @@ public class AuthController {
         String email = authentication.getName(); // This is the username/email
         String token = jwtUtil.generateToken(email);
 
-        return ResponseEntity.ok(new AuthenticationResponseDTO(token, newUser.getEmail(), newUser.getRole()));
+        return ResponseEntity.ok(new AuthenticationResponseDTO(token, newUser.getEmail(), newUser.getRole(), newUser.getId()));
     }
 
     @PostMapping("/login")
@@ -68,7 +68,7 @@ public class AuthController {
         String token = jwtUtil.generateToken(email);
 
         User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
-        return ResponseEntity.ok(new AuthenticationResponseDTO(token, user.getEmail(), user.getRole()));
+        return ResponseEntity.ok(new AuthenticationResponseDTO(token, user.getEmail(), user.getRole(), user.getId()));
     }
 
 

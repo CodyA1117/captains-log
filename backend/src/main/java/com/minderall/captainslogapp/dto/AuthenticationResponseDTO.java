@@ -5,14 +5,16 @@ public class AuthenticationResponseDTO {
     private String token;
     private String email;
     private String role;
+    private Long userId;
 
     public AuthenticationResponseDTO() {
     }
 
-    public AuthenticationResponseDTO(String token, String email, String role) {
+    public AuthenticationResponseDTO(String token, String email, String role, Long userId) {
         this.token = token;
         this.email = email;
         this.role = role;
+        this.userId = userId;
     }
 
     public String getToken() {
@@ -37,5 +39,13 @@ public class AuthenticationResponseDTO {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 }
