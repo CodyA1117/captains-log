@@ -7,31 +7,41 @@ const TodayStats = () => {
   const [syncMessage, setSyncMessage] = useState("");
   const token = localStorage.getItem("token");
 
-  // Check if the user has previously connected Oura
-  const checkConnection = async () => {
+  const fetchTodayData = async () => {
     try {
-      const res = await axios.get("/api/oura/sync-today", {
+      const res = await axios.get("/api/oura/today", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (res.status === 200) {
+      console.log("🟢 Backend responded:", res);
+
+      if (res.data) {
+        setOuraData({
+          readiness: res.data.readinessScore,
+          sleepScore: res.data.sleepScore,
+          activityScore: res.data.activityScore,
+          heartRate: res.data.heartRate,
+        });
         setIsConnected(true);
+      } else {
+        console.log("⚠️ No data in response (res.data is null or undefined)");
       }
     } catch (err) {
+      console.error("🔴 Failed to fetch today's Oura data:", err);
       setIsConnected(false);
     }
   };
 
+
   useEffect(() => {
-    checkConnection();
+    fetchTodayData();
   }, []);
 
-  // Redirect to Oura login to authorize the user
   const connectOura = () => {
-    window.location.href = "/api/oura/start";
+    window.location.href = "http://localhost:8080/api/oura/start";
+
   };
 
-  // Sync all available Oura data
   const syncOuraData = async () => {
     try {
       setSyncMessage("Syncing data...");
@@ -49,14 +59,7 @@ const TodayStats = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // For now, simulate updated values since no /oura/today endpoint exists yet
-      setOuraData({
-        readiness: "Synced",
-        sleepScore: "Synced",
-        activityScore: "Synced",
-        heartRate: "Synced",
-      });
-
+      await fetchTodayData();
       setSyncMessage("Oura data synced!");
     } catch (err) {
       console.error("Failed to sync Oura data:", err);
@@ -90,10 +93,10 @@ const TodayStats = () => {
 
           {ouraData ? (
             <div className="mb-4">
-              <p><strong>Oura Readiness:</strong> {ouraData.readiness}</p>
-              <p><strong>Oura Sleep:</strong> {ouraData.sleepScore}</p>
-              <p><strong>Oura Activity:</strong> {ouraData.activityScore}</p>
-              <p><strong>Heart Rate:</strong> {ouraData.heartRate}</p>
+              <p><strong>Oura Readiness:</strong> {ouraData.readiness ?? "N/A"}</p>
+              <p><strong>Oura Sleep:</strong> {ouraData.sleepScore ?? "N/A"}</p>
+              <p><strong>Oura Activity:</strong> {ouraData.activityScore ?? "N/A"}</p>
+              <p><strong>Heart Rate:</strong> {ouraData.heartRate ?? "N/A"}</p>
             </div>
           ) : (
             <p className="text-sm text-gray-500">

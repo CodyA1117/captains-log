@@ -4,6 +4,7 @@ import PrivateRoute from "./components/PrivateRoute";
 import Dashboard from "./pages/Dashboard"; // We'll build this next
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import OuraSuccess from "./pages/OuraSuccess";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/oura-success" element={<OuraSuccess />} />
         <Route
           path="/dashboard"
           element={
