@@ -38,6 +38,9 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthenticationResponseDTO> register(@RequestBody AuthenticationRequestDTO request) {
+        System.out.println("📨 Received registration request for: " + request.getEmail());
+        System.out.println("🔑 Raw password input: " + request.getPassword());
+
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             return ResponseEntity.badRequest().build();
         }

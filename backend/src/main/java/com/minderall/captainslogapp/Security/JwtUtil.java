@@ -16,7 +16,7 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    private static final String SECRET_KEY = "6A7D8F9B1C2E3G4H5I6J7K8L9M0N1O2P"; // use env var or config in production
+    private static final String SECRET_KEY = "qXe0vG9B5RjsdS62hvK41qtdt+Yp3WREKhAxSnV/EgU="; // use env var or config in production
     private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24; // 24 hours
 
     public String extractUsername(String token) {
