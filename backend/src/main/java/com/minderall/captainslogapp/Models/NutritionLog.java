@@ -1,5 +1,6 @@
 package com.minderall.captainslogapp.Models;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
@@ -10,87 +11,54 @@ public class NutritionLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String userId;
+    // Removed String userId, will use the User object relationship
+    // private String userId;
+
+    @ManyToOne(fetch = FetchType.LAZY) // Good practice for performance
+    @JoinColumn(name = "app_user_id", nullable = false) // Name of the foreign key column
+    @JsonBackReference("user-nutritionlogs") // To prevent serialization loops
+    private User user; // Link to your app's User entity
 
     private LocalDate date;
-    private double protein;
-    private double carbs;
-    private double fat;
-    private double bodyWeight;
-    private double waterIntakeOz;
+    private Double protein; // Use Double for precision
+    private Double carbs;
+    private Double fat;
+    private Double calories; // Often useful to store total calories
+    private Double bodyWeight; // Assuming this is in user's preferred unit (e.g., kg or lbs)
+    private Double waterIntakeOz;
 
-    @Lob
-    private String mealsJson;
+    @Lob // For potentially large JSON string
+    @Column(columnDefinition = "TEXT")
+    private String mealsJson; // Store raw food items if needed
 
-    public Long getId() {
-        return id;
-    }
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-    public String getUserId() {
-        return userId;
-    }
+    public LocalDate getDate() { return date; }
+    public void setDate(LocalDate date) { this.date = date; }
 
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
+    public Double getProtein() { return protein; }
+    public void setProtein(Double protein) { this.protein = protein; }
 
-    public LocalDate getDate() {
-        return date;
-    }
+    public Double getCarbs() { return carbs; }
+    public void setCarbs(Double carbs) { this.carbs = carbs; }
 
-    public void setDate(LocalDate date) {
-        this.date = date;
-    }
+    public Double getFat() { return fat; }
+    public void setFat(Double fat) { this.fat = fat; }
 
-    public double getProtein() {
-        return protein;
-    }
+    public Double getCalories() { return calories; }
+    public void setCalories(Double calories) { this.calories = calories; }
 
-    public void setProtein(double protein) {
-        this.protein = protein;
-    }
+    public Double getBodyWeight() { return bodyWeight; }
+    public void setBodyWeight(Double bodyWeight) { this.bodyWeight = bodyWeight; }
 
-    public double getCarbs() {
-        return carbs;
-    }
+    public Double getWaterIntakeOz() { return waterIntakeOz; }
+    public void setWaterIntakeOz(Double waterIntakeOz) { this.waterIntakeOz = waterIntakeOz; }
 
-    public void setCarbs(double carbs) {
-        this.carbs = carbs;
-    }
-
-    public double getFat() {
-        return fat;
-    }
-
-    public void setFat(double fat) {
-        this.fat = fat;
-    }
-
-    public double getBodyWeight() {
-        return bodyWeight;
-    }
-
-    public void setBodyWeight(double bodyWeight) {
-        this.bodyWeight = bodyWeight;
-    }
-
-    public double getWaterIntakeOz() {
-        return waterIntakeOz;
-    }
-
-    public void setWaterIntakeOz(double waterIntakeOz) {
-        this.waterIntakeOz = waterIntakeOz;
-    }
-
-    public String getMealsJson() {
-        return mealsJson;
-    }
-
-    public void setMealsJson(String mealsJson) {
-        this.mealsJson = mealsJson;
-    }
+    public String getMealsJson() { return mealsJson; }
+    public void setMealsJson(String mealsJson) { this.mealsJson = mealsJson; }
 }
