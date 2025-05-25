@@ -1,101 +1,95 @@
 package com.minderall.captainslogapp.Controllers;
 
+import com.minderall.captainslogapp.dto.MessageResponse;
+import com.minderall.captainslogapp.dto.EntryRequest;
+import com.minderall.captainslogapp.dto.EntryResponse;
+import com.minderall.captainslogapp.Security.UserDetailsImpl;
 import com.minderall.captainslogapp.Services.EntryService;
-import com.minderall.captainslogapp.dto.EntryRequestDTO;
-import com.minderall.captainslogapp.dto.EntryResponseDTO;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/entries") // Changed from /api/logs for clarity, match frontend expectations
+@RequestMapping("/api/entries")
 public class EntryController {
 
     @Autowired
     private EntryService entryService;
 
-    // Get all entries for the authenticated user
+    @PostMapping
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<EntryResponse> createEntry(@AuthenticationPrincipal UserDetailsImpl userDetails,
+                                                     @Valid @RequestBody EntryRequest entryRequest) {
+        EntryResponse createdEntry = entryService.createEntry(userDetails.getId(), entryRequest);
+        return new ResponseEntity<>(createdEntry, HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{entryId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<EntryResponse> getEntryById(@AuthenticationPrincipal UserDetailsImpl userDetails,
+                                                      @PathVariable Long entryId) {
+        EntryResponse entry = entryService.getEntryById(userDetails.getId(), entryId);
+        return ResponseEntity.ok(entry);
+    }
+
     @GetMapping
-    public ResponseEntity<List<EntryResponseDTO>> getUserEntries(@AuthenticationPrincipal UserDetails userDetails) {
-        if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        List<EntryResponseDTO> entries = entryService.getUserEntries(userDetails.getUsername());
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Page<EntryResponse>> getAllEntriesByUser(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "entryDate,desc") String[] sort) { // Example: sort=entryDate,desc&sort=createdAt,desc
+
+        Sort.Direction direction = sort[1].equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sort[0]));
+        // For multiple sort criteria, you'd need a more complex parsing or pass them differently
+
+        Page<EntryResponse> entries = entryService.getAllEntriesByUser(userDetails.getId(), pageable);
         return ResponseEntity.ok(entries);
     }
 
-    // Get a specific entry by ID for the authenticated user
-    @GetMapping("/{id}")
-    public ResponseEntity<EntryResponseDTO> getEntryById(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        return entryService.getEntryByIdAndUser(id, userDetails.getUsername())
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    @PutMapping("/{entryId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<EntryResponse> updateEntry(@AuthenticationPrincipal UserDetailsImpl userDetails,
+                                                     @PathVariable Long entryId,
+                                                     @Valid @RequestBody EntryRequest entryRequest) {
+        EntryResponse updatedEntry = entryService.updateEntry(userDetails.getId(), entryId, entryRequest);
+        return ResponseEntity.ok(updatedEntry);
     }
 
-    // Create a new entry for the authenticated user
-    @PostMapping
-    public ResponseEntity<EntryResponseDTO> createEntry(
-            @RequestBody EntryRequestDTO entryRequestDTO,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        try {
-            EntryResponseDTO createdEntry = entryService.createEntry(entryRequestDTO, userDetails.getUsername());
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdEntry);
-        } catch (Exception e) {
-            // Log exception e
-            return ResponseEntity.badRequest().build(); // Or more specific error
-        }
+    @DeleteMapping("/{entryId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<MessageResponse> deleteEntry(@AuthenticationPrincipal UserDetailsImpl userDetails,
+                                                       @PathVariable Long entryId) {
+        entryService.deleteEntry(userDetails.getId(), entryId);
+        return ResponseEntity.ok(new MessageResponse("Entry deleted successfully"));
     }
 
-    // Update an existing entry by ID for the authenticated user
-    @PutMapping("/{id}")
-    public ResponseEntity<EntryResponseDTO> updateEntry(
-            @PathVariable Long id,
-            @RequestBody EntryRequestDTO entryRequestDTO,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        try {
-            EntryResponseDTO updatedEntry = entryService.updateEntry(id, entryRequestDTO, userDetails.getUsername());
-            return ResponseEntity.ok(updatedEntry);
-        } catch (ResponseStatusException e) { // Catch specific exception from service
-            return ResponseEntity.status(e.getStatusCode()).build();
-        } catch (Exception e) {
-            // Log exception e
-            return ResponseEntity.badRequest().build();
-        }
+    @GetMapping("/range")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<List<EntryResponse>> getEntriesByDateRange(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @RequestParam String startDate, // Expects YYYY-MM-DD
+            @RequestParam String endDate) {  // Expects YYYY-MM-DD
+        List<EntryResponse> entries = entryService.getEntriesByUserAndDateRange(userDetails.getId(), startDate, endDate);
+        return ResponseEntity.ok(entries);
     }
 
-    // Delete an entry by ID for the authenticated user
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteEntry(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        try {
-            entryService.deleteEntry(id, userDetails.getUsername());
-            return ResponseEntity.noContent().build(); // 204 No Content on successful delete
-        } catch (ResponseStatusException e) {
-            return ResponseEntity.status(e.getStatusCode()).build();
-        } catch (Exception e) {
-            // Log exception e
-            return ResponseEntity.internalServerError().build();
-        }
-    }
+    // Optional: Endpoint to get a random prompt
+    // @GetMapping("/prompt")
+    // @PreAuthorize("hasRole('USER')")
+    // public ResponseEntity<MessageResponse> getRandomPrompt() {
+    //     String prompt = entryService.getRandomReflectionPrompt();
+    // return ResponseEntity.ok(new MessageResponse(prompt));
+    // }
 }

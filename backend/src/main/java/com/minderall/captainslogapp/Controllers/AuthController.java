@@ -1,78 +1,82 @@
 package com.minderall.captainslogapp.Controllers;
 
 import com.minderall.captainslogapp.Models.User;
+import com.minderall.captainslogapp.dto.JwtResponse;
+import com.minderall.captainslogapp.dto.LoginRequest;
+import com.minderall.captainslogapp.dto.SignupRequest;
+import com.minderall.captainslogapp.dto.MessageResponse;
 import com.minderall.captainslogapp.Repositories.UserRepository;
-import com.minderall.captainslogapp.Security.JwtUtil;
-import com.minderall.captainslogapp.dto.AuthenticationRequestDTO;
-import com.minderall.captainslogapp.dto.AuthenticationResponseDTO;
+import com.minderall.captainslogapp.Security.JwtUtils;
+import com.minderall.captainslogapp.Security.UserDetailsImpl;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+@CrossOrigin(origins = "*", maxAge = 3600) // Allow all origins for now, refine in production
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
     @Autowired
-    private AuthenticationManager authenticationManager;
+    AuthenticationManager authenticationManager;
 
     @Autowired
-    private UserRepository userRepository;
+    UserRepository userRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    PasswordEncoder encoder;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    JwtUtils jwtUtils;
 
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/api/test/admin-only")
-    public String adminOnlyRoute() {
-        return "Only accessible by users with ADMIN role!";
+    @PostMapping("/signin")
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(new JwtResponse(jwt,
+                userDetails.getId(),
+                userDetails.getUsername(), // which is email
+                roles));
     }
 
-    @PostMapping("/register")
-    public ResponseEntity<AuthenticationResponseDTO> register(@RequestBody AuthenticationRequestDTO request) {
-        System.out.println("📨 Received registration request for: " + request.getEmail());
-        System.out.println("🔑 Raw password input: " + request.getPassword());
-
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().build();
+    @PostMapping("/signup")
+    public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
+        if (userRepository.existsByEmail(signUpRequest.getEmail())) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Error: Email is already in use!"));
         }
 
-        User newUser = new User();
-        newUser.setEmail(request.getEmail());
-        newUser.setPassword(passwordEncoder.encode(request.getPassword()));
-        newUser.setRole("USER"); // default role
-        userRepository.save(newUser);
+        // Create new user's account
+        User user = User.builder()
+                .email(signUpRequest.getEmail())
+                .password(encoder.encode(signUpRequest.getPassword()))
+                .role("ROLE_USER") // Default role for new users
+                .build();
+        // Note: ouraOAuthToken, ouraRefreshToken, tokenExpiry will be null initially
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        userRepository.save(user);
 
-        String email = authentication.getName(); // This is the username/email
-        String token = jwtUtil.generateToken(email);
-
-        return ResponseEntity.ok(new AuthenticationResponseDTO(token, newUser.getEmail(), newUser.getRole(), newUser.getId()));
+        return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
     }
-
-    @PostMapping("/login")
-    public ResponseEntity<AuthenticationResponseDTO> login(@RequestBody AuthenticationRequestDTO request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
-
-        String email = authentication.getName(); // This is the username/email
-        String token = jwtUtil.generateToken(email);
-
-        User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
-        return ResponseEntity.ok(new AuthenticationResponseDTO(token, user.getEmail(), user.getRole(), user.getId()));
-    }
-
-
 }

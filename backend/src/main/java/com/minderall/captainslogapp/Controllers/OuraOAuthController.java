@@ -2,9 +2,7 @@ package com.minderall.captainslogapp.Controllers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.minderall.captainslogapp.Models.OuraToken;
 import com.minderall.captainslogapp.Models.User;
-import com.minderall.captainslogapp.Repositories.OuraTokenRepository;
 import com.minderall.captainslogapp.Repositories.UserRepository;
 import com.minderall.captainslogapp.Security.JwtUtil;
 import com.minderall.captainslogapp.Services.OuraDataService;
@@ -14,7 +12,6 @@ import org.slf4j.LoggerFactory; // Import SLF4J LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -28,7 +25,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Optional; // Import Optional
 
 @RestController
 @RequestMapping("/api/oura")

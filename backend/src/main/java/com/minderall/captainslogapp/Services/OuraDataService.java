@@ -3,15 +3,14 @@ package com.minderall.captainslogapp.Services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minderall.captainslogapp.Models.OuraData;
-import com.minderall.captainslogapp.Models.OuraToken;
 import com.minderall.captainslogapp.Models.User;
 import com.minderall.captainslogapp.Repositories.OuraDataRepository;
-import com.minderall.captainslogapp.Repositories.OuraTokenRepository;
 import com.minderall.captainslogapp.Repositories.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -20,7 +19,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.function.Function; // Ensure this is java.util.function.Function
+import java.util.function.Function;
 
 @Service
 public class OuraDataService {
@@ -34,14 +33,13 @@ public class OuraDataService {
     private OuraDataRepository dataRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserRepository userRepository; // Used in getTodayOuraData
 
     private final String OURA_API_BASE_URL = "https://api.ouraring.com/v2/usercollection/";
     private final String READINESS_ENDPOINT = OURA_API_BASE_URL + "daily_readiness";
     private final String SLEEP_ENDPOINT = OURA_API_BASE_URL + "daily_sleep";
     private final String ACTIVITY_ENDPOINT = OURA_API_BASE_URL + "daily_activity";
     private final String STRESS_ENDPOINT = OURA_API_BASE_URL + "daily_stress";
-    // private final String HEART_RATE_TIMESERIES_ENDPOINT = OURA_API_BASE_URL + "heart_rate"; // Not used for daily summary
 
     private OuraData getOrCreateOuraDataRecord(User user, LocalDate date) {
         List<OuraData> existingDataList = dataRepository.findByUserAndDate(user, date);
@@ -55,18 +53,25 @@ public class OuraDataService {
             OuraData newData = new OuraData();
             newData.setUser(user);
             newData.setDate(date);
+            // Initialize all Double fields to 0.0 to avoid DB null constraint issues on new records
+            newData.setReadinessScore(null); // Scores can be null initially
+            newData.setSleepScore(null);
+            newData.setActivityScore(null);
+            newData.setHeartRate(null);
+            newData.setStressScore(null);
             return newData;
         }
     }
 
     private void fetchAndSaveGenericOuraMetric(String userEmail, String endpoint, String metricName,
-                                               Function<JsonNode, Integer> jsonFieldExtractor, // Corrected import
+                                               Function<JsonNode, Integer> jsonFieldExtractor,
                                                BiConsumer<OuraData, Integer> dataSetter) {
         Optional<OuraToken> optionalToken = tokenRepository.findByUserEmail(userEmail);
         if (optionalToken.isEmpty()) {
-            logger.warn("No Oura token found for user {} while fetching {}.", userEmail, metricName);
+            logger.warn("No Oura token found for user {} while fetching {}. User needs to connect Oura.", userEmail, metricName);
             return;
         }
+
         User user = optionalToken.get().getUser();
         String accessToken = optionalToken.get().getAccessToken();
 
@@ -80,11 +85,9 @@ public class OuraDataService {
             logger.debug("Fetching {} for user {} from URL: {}", metricName, userEmail, url);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
 
-            // VVVV TEMPORARY RAW JSON LOGGING - REMOVE OR COMMENT OUT AFTER DEBUGGING VVVV
             if (response.getBody() != null) {
                 logger.info("<<<<< RAW OURA RESPONSE for [{}] for user {} >>>>>: {}", metricName, userEmail, response.getBody());
             }
-            // ^^^^ TEMPORARY RAW JSON LOGGING - REMOVE OR COMMENT OUT AFTER DEBUGGING ^^^^
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 ObjectMapper mapper = new ObjectMapper();
@@ -92,7 +95,7 @@ public class OuraDataService {
                 JsonNode dataArray = root.path("data");
 
                 if (dataArray.isArray() && !dataArray.isEmpty()) {
-                    JsonNode todayDataNode = dataArray.get(0); // Assumes data for 'today' is the first item
+                    JsonNode todayDataNode = dataArray.get(0);
                     Integer metricValue = jsonFieldExtractor.apply(todayDataNode);
 
                     if (metricValue != null && metricValue != -1) {
@@ -110,7 +113,12 @@ public class OuraDataService {
                 logger.error("Failed to fetch {} from Oura for user {}. Status: {}, Body: {}", metricName, userEmail, response.getStatusCode(), response.getBody());
             }
         } catch (HttpClientErrorException e) {
-            logger.error("Oura API HTTP Error while fetching [{}] for user {}: Status Code: {}, Response Body: {}", metricName, userEmail, e.getStatusCode(), e.getResponseBodyAsString(), e);
+            // Log 401 specifically, user will need to re-authenticate with Oura via UI
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                logger.error("Oura API returned 401 UNAUTHORIZED for user {} fetching [{}]. Access token likely expired or revoked. User needs to re-connect Oura. Detail: {}", userEmail, metricName, e.getResponseBodyAsString());
+            } else {
+                logger.error("Oura API HTTP Error while fetching [{}] for user {}: Status Code: {}, Response Body: {}", metricName, userEmail, e.getStatusCode(), e.getResponseBodyAsString(), e);
+            }
         } catch (Exception e) {
             logger.error("General error processing {} data for user {}: {}", metricName, userEmail, e.getMessage(), e);
         }
@@ -124,7 +132,7 @@ public class OuraDataService {
     }
 
     public void fetchAndSaveTodaySleepScore(String userEmail) {
-        fetchAndSaveGenericOuraMetric(userEmail, SLEEP_ENDPOINT, "Sleep Score", // Changed metric name for clarity
+        fetchAndSaveGenericOuraMetric(userEmail, SLEEP_ENDPOINT, "Sleep Score",
                 jsonNode -> jsonNode.path("score").asInt(-1),
                 OuraData::setSleepScore
         );
@@ -138,25 +146,19 @@ public class OuraDataService {
     }
 
     public void fetchAndSaveTodayStressScore(String userEmail) {
-        // Oura V2 /daily_stress provides "day_stress_balance" or "contributors.recovery_time_rate" etc.
-        // We'll attempt to use "day_stress_balance".
-        fetchAndSaveGenericOuraMetric(userEmail, STRESS_ENDPOINT, "Stress (Day Stress Balance)",
-                // This value might be a float or not always present, asInt(-1) will handle.
-                jsonNode -> jsonNode.path("day_stress_balance").asInt(-1),
+        // **YOU MUST UPDATE THE PATH BELOW BASED ON YOUR ACTUAL RAW STRESS JSON LOGS**
+        // This is just a placeholder. If Oura returns no data or this path is wrong, it will be N/A.
+        fetchAndSaveGenericOuraMetric(userEmail, STRESS_ENDPOINT, "Stress (Example: day_stress_balance)",
+                jsonNode -> jsonNode.path("day_stress_balance").asInt(-1), // <<< ADJUST THIS PATH!!!
                 OuraData::setStressScore
         );
     }
 
     public void fetchAndSaveTodayHeartRate(String userEmail) {
-        // Resting heart rate IS available directly in the /daily_sleep object according to Oura V2 docs.
-        // However, your logs showed it missing from the sleep data but present in readiness contributors.
-        // Let's prioritize the documented field from Daily Sleep first. If it's often missing,
-        // an alternative could be readiness contributors, but that might reflect differently.
-        // The WARNING "value not found or invalid (-1)" for HR from sleep means the field "resting_heart_rate"
-        // was not present in the sleep JSON object that day.
-        // Let's stick to the documented source (Daily Sleep) and accept it might be N/A some days.
-        fetchAndSaveGenericOuraMetric(userEmail, SLEEP_ENDPOINT, "Resting Heart Rate (from Sleep)",
-                jsonNode -> jsonNode.path("resting_heart_rate").asInt(-1), // From Oura V2 Daily Sleep object
+        // Attempting to get resting_heart_rate from Daily Readiness contributors, as it seemed more reliable in your logs
+        logger.info("Fetching Resting Heart Rate from Daily Readiness contributors for user {}.", userEmail);
+        fetchAndSaveGenericOuraMetric(userEmail, READINESS_ENDPOINT, "Resting Heart Rate (from Readiness)",
+                jsonNode -> jsonNode.path("contributors").path("resting_heart_rate").asInt(-1),
                 OuraData::setHeartRate
         );
     }
@@ -169,29 +171,24 @@ public class OuraDataService {
     }
 
     public Optional<OuraData> getTodayOuraData(String email) {
-        Optional<User> userOpt = userRepository.findByEmail(email);
-        if (userOpt.isEmpty()) {
-            logger.warn("User not found for email {} when calling getTodayOuraData.", email);
-            return Optional.empty();
-        }
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
 
-        User user = userOpt.get();
-        LocalDate today = LocalDate.now();
-        List<OuraData> dataList = dataRepository.findByUserAndDate(user, today);
-
+        List<OuraData> dataList = dataRepository.findByUserAndDate(user, LocalDate.now());
         if (!dataList.isEmpty()) {
-            if (dataList.size() > 1) {
-                logger.warn("Found {} OuraData records for user ID {} on {} for getTodayOuraData. Returning the first one.",
-                        dataList.size(), user.getId(), today);
-            }
-            // Make sure the returned OuraData object actually has values set
             OuraData data = dataList.get(0);
-            if (data.getReadinessScore() == null && data.getSleepScore() == null && data.getActivityScore() == null && data.getHeartRate() == null) {
-                logger.warn("OuraData record found for user {} on {}, but all metric fields are null. Data might not have synced properly.", email, today);
+            // Check if there's any actual score data, not just an empty record
+            if (data.getReadinessScore() != null || data.getSleepScore() != null ||
+                    data.getActivityScore() != null || data.getHeartRate() != null ||
+                    data.getStressScore() != null) {
+                logger.info("Returning OuraData for user {} on {}: {}", email, LocalDate.now(), data);
+                return Optional.of(data);
+            } else {
+                logger.info("OuraData record exists for user {} on {} but all score fields are null.", email, LocalDate.now());
+                return Optional.empty(); // Treat as no meaningful data
             }
-            return Optional.of(data);
         }
-        logger.info("No OuraData database record found for user ID {} on {} for getTodayOuraData.", user.getId(), today);
+        logger.info("No OuraData database record found for user ID {} on {} for getTodayOuraData.", user.getId(), LocalDate.now());
         return Optional.empty();
     }
 }

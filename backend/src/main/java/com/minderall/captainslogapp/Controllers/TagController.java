@@ -1,10 +1,7 @@
 package com.minderall.captainslogapp.Controllers;
 
-import com.minderall.captainslogapp.Models.Tag;
 import com.minderall.captainslogapp.Models.User;
-import com.minderall.captainslogapp.Repositories.TagRepository;
 import com.minderall.captainslogapp.Repositories.UserRepository;
-import com.minderall.captainslogapp.dto.TagDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
